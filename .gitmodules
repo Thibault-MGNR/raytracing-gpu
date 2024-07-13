@@ -1,0 +1,3 @@
+[submodule "lib/GPGPU"]
+	path = lib/GPGPU
+	url = https://github.com/Thibault-MGNR/gpgpu.git
