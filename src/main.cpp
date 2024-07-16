@@ -1,6 +1,11 @@
 #include <GPGPU/GPGPU.hpp>
 #include <filesystem>
 #include <cstddef>
+#include <vector>
+
+#include "raytracing/camera.hpp"
+#include "raytracing/light.hpp"
+#include "raytracing/sphere.hpp"
 
 class App: public GPGPU {
 	public:
@@ -12,22 +17,29 @@ class App: public GPGPU {
 		}
 
 	private:
-		struct CameraData {
-			glm::vec2 position;
-		};
-
-
 		virtual void beforeRun() override {
-			_camData.position = {500.f, 500.f};
+			_camData.position = {0.f, 0.f, 0.f};
+			_camData.orientation = glm::quat({0.f, 0.f, 0.f});
+			_camData.resolution = {1000.f, 1000.f};
+			_camData.fov = 90.f;
+			_cam.init(_camData);
 
-			// offsetof(CameraData, position);
+			LightData l1;
+			l1.color = {255.f, 255.f, 255.f};
+			l1.intensity = 200.f;
+			l1.position = {5.f, 5.f, 5.f};
+			_light.init(l1);
 
-			_ubo.init<CameraData>(&_camData, 1);
+			SphereData sd;
+			sd.color = {255.f, 0.f, 0.f};
+			sd.radius = 1.f;
+			sd.position = {5.f, 0.f, 0.f};
+
 		}
 
 		virtual void renderFrame() override {
-			_camData.position = _window.getCurrentCursorPos();
-			_ubo.subData(offsetof(CameraData, position), sizeof(glm::vec2), &_camData.position);
+			_cam.updateGPUData();
+
 			_cs.use();
 			_cs.setFloat("t", _window.getTime());
 			glDispatchCompute((unsigned int)1000/8, (unsigned int)1000/8, 1);
@@ -37,7 +49,11 @@ class App: public GPGPU {
 
 		ComputeShader _cs;
 		CameraData _camData;
-};
+		Camera _cam;
+		Light _light;
+		Sphere _sphere;
+};		
+
 
 int main()
 {
