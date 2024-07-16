@@ -4,9 +4,12 @@
 #include <GPGPU/UBO.hpp>
 
 struct SphereData {
-    float radius;
     glm::vec3 position;
+    float padding0;
     glm::vec3 color;
+    float padding1;
+    float radius;
+    glm::vec3 padding2;
 };
 
 class Sphere {

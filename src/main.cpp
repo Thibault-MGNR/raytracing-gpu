@@ -25,20 +25,20 @@ class App: public GPGPU {
 			_cam.init(_camData);
 
 			LightData l1;
-			l1.color = {255.f, 255.f, 255.f};
+			l1.color = {1.f, 1.f, 1.f};
 			l1.intensity = 200.f;
 			l1.position = {5.f, 5.f, 5.f};
 			_light.init(l1);
 
 			SphereData sd;
-			sd.color = {255.f, 0.f, 0.f};
+			sd.color = {1.f, 0.f, 0.f};
 			sd.radius = 1.f;
 			sd.position = {5.f, 0.f, 0.f};
-
+			_sphere.init(sd);
 		}
 
 		virtual void renderFrame() override {
-			_cam.updateGPUData();
+			// _cam.updateGPUData();
 
 			_cs.use();
 			_cs.setFloat("t", _window.getTime());

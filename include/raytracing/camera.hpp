@@ -1,8 +1,8 @@
 #pragma once
-#define GLM_ENABLE_EXPERIMENTAL
+// #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
-#include <glm/gtx/quaternion.hpp>
+// #include <glm/gtx/quaternion.hpp>
 
 #include <GPGPU/UBO.hpp>
 
@@ -15,9 +15,12 @@ struct CameraData {
 
 struct GPUCamData {
     glm::vec3 position;
-    glm::mat4 rotationMatrix;
-    float fov;
+    float padding1;
+    // glm::mat4 rotationMatrix;
     glm::vec2 resolution;
+    glm::vec2 padding2;
+    float fov;
+    glm::vec3 padding3;
 };
 
 class Camera {

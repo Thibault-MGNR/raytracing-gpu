@@ -1,5 +1,7 @@
 #include "raytracing/camera.hpp"
 
+#include <iostream>
+
 Camera::Camera(){
     _newData = false;
 }
@@ -39,7 +41,7 @@ void Camera::transformDataForGPU(){
     _GPUData.fov = _data.fov;
     _GPUData.position = _data.position;
     _GPUData.resolution = _data.resolution;
-    _GPUData.rotationMatrix = glm::toMat4(_data.orientation);
+    // _GPUData.rotationMatrix = glm::toMat4(_data.orientation);
 }
 
 // ------------------------------------------------------------------------

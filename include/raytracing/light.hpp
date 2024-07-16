@@ -4,9 +4,12 @@
 #include <GPGPU/UBO.hpp>
 
 struct LightData {
-    float intensity;
     glm::vec3 position;
+    float padding1;
     glm::vec3 color;
+    float padding2;
+    float intensity;
+    glm::vec3 padding3;
 };
 
 class Light {
