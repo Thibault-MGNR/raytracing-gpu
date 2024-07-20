@@ -8,7 +8,7 @@ Camera::Camera(){
 
 // ------------------------------------------------------------------------
 
-void Camera::init(const CameraData& data){
+void Camera::init(const CameraData data){
     _data = data;
     transformDataForGPU();
     _ubo.init<GPUCamData>(&_GPUData, 3);
@@ -42,9 +42,6 @@ void Camera::transformDataForGPU(){
     _GPUData.position = _data.position;
     _GPUData.resolution = _data.resolution;
 
-    
-    std::cout << offsetof(GPUCamData, position) << std::endl;
-    std::cout << offsetof(GPUCamData, resolution) << std::endl;
     // _GPUData.rotationMatrix = glm::toMat4(_data.orientation);
 }
 

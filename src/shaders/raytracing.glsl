@@ -1,25 +1,59 @@
 #version 460 core
 
-layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+/*
+    Binding n°      associated block
+        0                 time
+        1               
+        2               imgOutput
+        3              CameraBlock
+        4              SpheresBlock
+        5              LightsBlock
+        6                           
+*/
 
-layout(rgba32f, binding = 2) uniform image2D imgOutput;
-
-layout(std140, binding = 3) uniform Camera {
+struct Camera {
     vec3 cameraPosition;
     vec2 cameraResolution;
     float cameraFov;
 };
 
-layout(std140, binding = 4) uniform Sphere {
+struct Light {
+    vec3 lightPosition;
+    vec3 lightColor;
+    float lightIntensity;
+};
+
+struct Sphere {
     vec3 spherePosition;
     vec3 sphereColor;
     float sphereRadius;
 };
 
-layout(std140, binding = 5) uniform Light {
-    vec3 lightPosition;
-    vec3 lightColor;
-    float lightIntensity;
+struct SceneInfo {
+    int nbLights;
+    int nbSpheres;
+};
+
+layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(rgba32f, binding = 2) uniform image2D imgOutput;
+
+layout(std140, binding = 3) uniform CameraBlock {
+    vec3 cameraPosition;
+    vec2 cameraResolution;
+    float cameraFov;
+};
+
+layout(std140, binding = 1) uniform SceneInfoBlock {
+    SceneInfo sceneInfo;
+};
+
+layout(std430, binding = 4) buffer SpheresBlock {
+    Sphere sphere[];
+};
+
+layout(std430, binding = 5) buffer LightsBlock {
+    Light lights[];
 };
 
 layout (location = 0) uniform float t;                 /** Time */
@@ -64,13 +98,11 @@ float calculateSphereIntersection(vec3 rayVector, vec3 rayOrigin, vec3 spherePos
 void main() {
     ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
 
-    float rad_ = sphereRadius + 0.5*sin(t);
+    float rad_ = sphere[0].sphereRadius + 0.5*sin(t);
 
-    float dist = calculateSphereIntersection(genLocalRayVector(), cameraPosition, spherePosition, rad_);
+    float dist = calculateSphereIntersection(genLocalRayVector(), cameraPosition, sphere[0].spherePosition, rad_);
 
-    
-
-    vec4 value = vec4(dist / 10.0, 0.0, 0.0, 1.0);
+    vec4 value = vec4(dist/10, 0.0, 0.0, 1.0);
 
     imageStore(imgOutput, texelCoord, value);
 }

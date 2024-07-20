@@ -3,9 +3,7 @@
 #include <cstddef>
 #include <vector>
 
-#include "raytracing/camera.hpp"
-#include "raytracing/light.hpp"
-#include "raytracing/sphere.hpp"
+#include "raytracing/scene.hpp"
 
 class App: public GPGPU {
 	public:
@@ -18,24 +16,26 @@ class App: public GPGPU {
 
 	private:
 		virtual void beforeRun() override {
-			_camData.position = {0.f, 0.f, 0.f};
-			_camData.orientation = glm::quat({0.f, 0.f, 0.f});
-			_camData.resolution = {1000.f, 1000.f};
-			_camData.fov = 90.f;
-
-			_cam.init(_camData);
+			CameraData camData;
+			camData.position = {0.f, 0.f, 0.f};
+			camData.orientation = glm::quat({0.f, 0.f, 0.f});
+			camData.resolution = {1000.f, 1000.f};
+			camData.fov = 90.f;
+			_scene.initCamera(camData);
 
 			LightData l1;
 			l1.color = {1.f, 1.f, 1.f};
 			l1.intensity = 200.f;
 			l1.position = {5.f, 5.f, 5.f};
-			_light.init(l1);
+			_scene.add(l1);
 
 			SphereData sd;
-			sd.color = {1.f, 0.f, 0.f};
+			sd.color = {7.f, 0.f, 0.f};
 			sd.radius = 1.f;
 			sd.position = {-3.f, 0.f, 0.f};
-			_sphere.init(sd);
+			_scene.add(sd);
+
+			_scene.send();
 		}
 
 		virtual void renderFrame() override {
@@ -49,10 +49,7 @@ class App: public GPGPU {
 		}
 
 		ComputeShader _cs;
-		CameraData _camData;
-		Camera _cam;
-		Light _light;
-		Sphere _sphere;
+		Scene _scene;
 };		
 
 
