@@ -1,7 +1,7 @@
 #include "raytracing/scene.hpp"
 
 Scene::Scene(){
-
+    _ubo.setUsage(GL_STATIC_COPY);
 }
 
 void Scene::init(){
@@ -11,6 +11,7 @@ void Scene::init(){
 // ------------------------------------------------------------------------
 
 void Scene::send(){
+    std::cout << GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT << std::endl;
     _ubo.subData(0, sizeof(sceneInfo), &_sceneInfo);
     _sphereManager.send();
     _lightManager.send();

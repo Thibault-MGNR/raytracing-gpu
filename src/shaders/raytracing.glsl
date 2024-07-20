@@ -14,7 +14,7 @@
 struct Camera {
     vec3 cameraPosition;
     vec2 cameraResolution;
-    float cameraFov;
+    float cameraFov_x_dist;
 };
 
 struct Light {
@@ -29,10 +29,10 @@ struct Sphere {
     float sphereRadius;
 };
 
-struct SceneInfo {
-    int nbLights;
-    int nbSpheres;
-};
+// struct SceneInfo {
+//     int nbLights;
+//     int nbSpheres;
+// };
 
 layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
@@ -41,11 +41,12 @@ layout(rgba32f, binding = 2) uniform image2D imgOutput;
 layout(std140, binding = 3) uniform CameraBlock {
     vec3 cameraPosition;
     vec2 cameraResolution;
-    float cameraFov;
+    float cameraFov_x_dist;
 };
 
 layout(std140, binding = 1) uniform SceneInfoBlock {
-    SceneInfo sceneInfo;
+    int nbLights;
+    int nbSpheres;
 };
 
 layout(std430, binding = 4) buffer SpheresBlock {
@@ -66,7 +67,7 @@ vec3 genLocalRayVector(){
     vec3 rayVector;
     rayVector.yz = gl_GlobalInvocationID.xy;
 
-    rayVector.x = (cameraResolution.x / 2.f) / (tan(radians(cameraFov/2.f)));
+    rayVector.x = cameraFov_x_dist;
 
     rayVector.yz = rayVector.yz - (cameraResolution / 2.f);
 
@@ -89,20 +90,31 @@ float calculateSphereIntersection(vec3 rayVector, vec3 rayOrigin, vec3 spherePos
     float validT1 = step(0.0, t1) * t1;
     float validT2 = step(0.0, t2) * t2;
 
-    float t = min(validT1, validT2);
-    t = mix(t, max(validT1, validT2), step(0.0, t)); 
+    float T = min(validT1, validT2);
+    T = mix(T, max(validT1, validT2), step(0.0, T)); 
     
-    return mix(-1.0, t, step(0.0, discriminant));
+    return mix(-1.0, T, step(0.0, discriminant));
 }
 
 void main() {
     ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
 
-    float rad_ = sphere[0].sphereRadius + 0.5*sin(t);
+    int idSphere = -1;
+    float dist = -1.0;
 
-    float dist = calculateSphereIntersection(genLocalRayVector(), cameraPosition, sphere[0].spherePosition, rad_);
+    vec3 localRayCam = genLocalRayVector();
 
-    vec4 value = vec4(dist/10, 0.0, 0.0, 1.0);
+    for (int i = 0; i < nbSpheres; i++) {
+        float distSpherei = calculateSphereIntersection(localRayCam, cameraPosition, sphere[i].spherePosition, sphere[i].sphereRadius);
+        
+        bool update = (distSpherei >= 0.0) && (dist < 0.0 || distSpherei < dist);
+        
+        dist = update ? distSpherei : dist;
+        idSphere = update ? i : idSphere;
+    }
+
+    vec4 value = (dist < 0.0) ? vec4(0.0, 0.0, 1.0, 1.0) : vec4(sphere[idSphere].sphereColor, 1.0);
 
     imageStore(imgOutput, texelCoord, value);
 }
+

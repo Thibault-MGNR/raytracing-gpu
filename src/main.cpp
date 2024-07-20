@@ -16,6 +16,8 @@ class App: public GPGPU {
 
 	private:
 		virtual void beforeRun() override {
+			_scene.init();
+			
 			CameraData camData;
 			camData.position = {0.f, 0.f, 0.f};
 			camData.orientation = glm::quat({0.f, 0.f, 0.f});
@@ -30,9 +32,14 @@ class App: public GPGPU {
 			_scene.add(l1);
 
 			SphereData sd;
-			sd.color = {7.f, 0.f, 0.f};
+			sd.color = {1.f, 0.f, 0.f};
 			sd.radius = 1.f;
 			sd.position = {-3.f, 0.f, 0.f};
+			_scene.add(sd);
+
+			sd.color = {1.f, 1.f, 0.f};
+			sd.radius = 0.5;
+			sd.position = {-3.f, 2.f, 1.f};
 			_scene.add(sd);
 
 			_scene.send();

@@ -1,9 +1,14 @@
 #include "raytracing/camera.hpp"
 
-#include <iostream>
+#include <numbers>
+
+static float radians(float x){
+    return (x * std::numbers::pi_v<float>) / 180.f;
+}
 
 Camera::Camera(){
     _newData = false;
+    _ubo.setUsage(GL_STATIC_COPY);
 }
 
 // ------------------------------------------------------------------------
@@ -38,7 +43,7 @@ void Camera::translation(glm::vec3& translation){
 // ------------------------------------------------------------------------
 
 void Camera::transformDataForGPU(){
-    _GPUData.fov = _data.fov;
+    _GPUData.fovDist = (_data.resolution[0] / 2.f) / tan(radians(_data.fov/2.f));
     _GPUData.position = _data.position;
     _GPUData.resolution = _data.resolution;
 

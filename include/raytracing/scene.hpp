@@ -1,6 +1,7 @@
 #pragma once
 
 #include <GPGPU/UBO.hpp>
+#include <glm/glm.hpp>
 
 #include "raytracing/spheres.hpp"
 #include "raytracing/lights.hpp"
@@ -16,9 +17,10 @@ class Scene{
         void initCamera(const CameraData camData);
     
     private:
-        struct sceneInfo{
+        struct sceneInfo {
             int nbLights = 0;
             int nbSpheres = 0;
+            glm::vec2 padding;
         };
 
         UBO _ubo;
