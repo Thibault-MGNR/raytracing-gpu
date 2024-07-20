@@ -5,11 +5,9 @@
 
 struct LightData {
     glm::vec3 position;
-    float padding1;
-    glm::vec3 color;
-    float padding2;
-    float intensity;
-    glm::vec3 padding3;
+    alignas(16) glm::vec3 color;
+    alignas(16) glm::vec3 padding3;
+    alignas(16) float intensity;
 };
 
 class Light {

@@ -22,6 +22,7 @@ class App: public GPGPU {
 			_camData.orientation = glm::quat({0.f, 0.f, 0.f});
 			_camData.resolution = {1000.f, 1000.f};
 			_camData.fov = 90.f;
+
 			_cam.init(_camData);
 
 			LightData l1;
@@ -33,7 +34,7 @@ class App: public GPGPU {
 			SphereData sd;
 			sd.color = {1.f, 0.f, 0.f};
 			sd.radius = 1.f;
-			sd.position = {5.f, 0.f, 0.f};
+			sd.position = {-3.f, 0.f, 0.f};
 			_sphere.init(sd);
 		}
 

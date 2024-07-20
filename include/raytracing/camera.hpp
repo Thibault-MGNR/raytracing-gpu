@@ -15,12 +15,8 @@ struct CameraData {
 
 struct GPUCamData {
     glm::vec3 position;
-    float padding1;
-    // glm::mat4 rotationMatrix;
-    glm::vec2 resolution;
-    glm::vec2 padding2;
+    alignas(16) glm::vec2 resolution;
     float fov;
-    glm::vec3 padding3;
 };
 
 class Camera {

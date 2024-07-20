@@ -5,11 +5,8 @@
 
 struct SphereData {
     glm::vec3 position;
-    float padding0;
-    glm::vec3 color;
-    float padding1;
+    alignas(16) glm::vec3 color;
     float radius;
-    glm::vec3 padding2;
 };
 
 class Sphere {
