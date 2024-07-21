@@ -46,6 +46,7 @@ void Camera::transformDataForGPU(){
     _GPUData.fovDist = (_data.resolution[0] / 2.f) / tan(radians(_data.fov/2.f));
     _GPUData.position = _data.position;
     _GPUData.resolution = _data.resolution;
+    _GPUData.iso = _data.iso;
 
     // _GPUData.rotationMatrix = glm::toMat4(_data.orientation);
 }

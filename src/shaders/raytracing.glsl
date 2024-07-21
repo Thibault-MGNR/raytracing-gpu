@@ -12,45 +12,43 @@
 */
 
 struct Camera {
-    vec3 cameraPosition;
-    vec2 cameraResolution;
-    float cameraFov_x_dist;
+    vec3 position;
+    vec2 resolution;
+    float fov_x_dist;
+    float iso;
 };
 
 struct Light {
-    vec3 lightPosition;
-    vec3 lightColor;
-    float lightIntensity;
+    vec3 position;
+    vec3 color;
+    float intensity;
 };
 
 struct Sphere {
-    vec3 spherePosition;
-    vec3 sphereColor;
-    float sphereRadius;
+    vec3 position;
+    vec3 color;
+    float radius;
 };
 
-// struct SceneInfo {
-//     int nbLights;
-//     int nbSpheres;
-// };
+struct SceneInfo {
+    int nbLights;
+    int nbSpheres;
+};
 
 layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(rgba32f, binding = 2) uniform image2D imgOutput;
 
 layout(std140, binding = 3) uniform CameraBlock {
-    vec3 cameraPosition;
-    vec2 cameraResolution;
-    float cameraFov_x_dist;
+    Camera camera;
 };
 
 layout(std140, binding = 1) uniform SceneInfoBlock {
-    int nbLights;
-    int nbSpheres;
+    SceneInfo sceneInfo;
 };
 
 layout(std430, binding = 4) buffer SpheresBlock {
-    Sphere sphere[];
+    Sphere spheres[];
 };
 
 layout(std430, binding = 5) buffer LightsBlock {
@@ -67,19 +65,20 @@ vec3 genLocalRayVector(){
     vec3 rayVector;
     rayVector.yz = gl_GlobalInvocationID.xy;
 
-    rayVector.x = cameraFov_x_dist;
+    rayVector.x = camera.fov_x_dist;
 
-    rayVector.yz = rayVector.yz - (cameraResolution / 2.f);
+    rayVector.yz = rayVector.yz - (camera.resolution / 2.f);
 
     rayVector = normalize(rayVector);
 
     return rayVector;
 }
 
-float calculateSphereIntersection(vec3 rayVector, vec3 rayOrigin, vec3 spherePosition, float radius){
-    vec3 L = spherePosition - rayOrigin;
-    float b = 2.0 * dot(L, rayVector);
-    float c = dot(L, L) - (radius * radius);
+float calculateSphereIntersection(vec3 rayVector, vec3 rayOrigin, int sphereId){
+    Sphere sphere = spheres[sphereId];
+    vec3 L = rayOrigin - sphere.position;
+    float b = 2.0 * dot(rayVector, L);
+    float c = dot(L, L) - (sphere.radius * sphere.radius);
 
     float discriminant = (b * b) - 4.0 * c;
     float sqrtDiscriminant = sqrt(discriminant);
@@ -87,13 +86,36 @@ float calculateSphereIntersection(vec3 rayVector, vec3 rayOrigin, vec3 spherePos
     float t1 = (-b + sqrtDiscriminant) / 2.0;
     float t2 = (-b - sqrtDiscriminant) / 2.0;
 
-    float validT1 = step(0.0, t1) * t1;
-    float validT2 = step(0.0, t2) * t2;
+    float T = -1.f;
+    T = (t1 > 0.f && t2 <= 0.f) ? t1 : T;
+    T = (t1 <= 0.f && t2 > 0.f) ? t2 : T;
+    T = ((t1 > 0.f && t2 > 0.f) && (t1 < t2)) ? t1 : T;
+    T = ((t1 > 0.f && t2 > 0.f) && (t1 >= t2)) ? t2 : T;
 
-    float T = min(validT1, validT2);
-    T = mix(T, max(validT1, validT2), step(0.0, T)); 
-    
-    return mix(-1.0, T, step(0.0, discriminant));
+    return T;
+}
+
+vec3 calculateIllumination(int sphereId, vec3 positionIntersection){
+    vec3 normalVec = normalize(positionIntersection - spheres[sphereId].position);
+    vec3 returnVal = vec3(0.f, 0.f, 0.f);
+
+    for(int lightId_ = 0; lightId_ < sceneInfo.nbLights; lightId_++){
+        bool hasIntersections = false;
+        Light currentLight = lights[lightId_];
+        vec3 lightVec = currentLight.position - positionIntersection;
+        vec3 lightVecN = normalize(currentLight.position - positionIntersection);
+
+        for(int sphereId_ = 0; sphereId_ < sceneInfo.nbSpheres; sphereId_++){
+            Sphere currentSphere = spheres[sphereId_];
+            vec3 contactPos = positionIntersection;
+            float intersect = calculateSphereIntersection(lightVecN, contactPos, sphereId_);
+            // hasIntersections = ((true) && ((intersect <= 0.f) || (intersect >= dot(lightVecN, lightVec)))) ? hasIntersections : true;
+            hasIntersections = ((sphereId != sphereId_) && ((intersect > 0.f) && (intersect < dot(lightVecN, lightVec)))) ? true : hasIntersections;
+            
+        }
+        returnVal = (!hasIntersections) ? returnVal + (dot(lightVecN, normalVec) * currentLight.color * currentLight.intensity * camera.iso / dot(lightVec, lightVec)): returnVal;
+    }
+    return returnVal;
 }
 
 void main() {
@@ -102,10 +124,13 @@ void main() {
     int idSphere = -1;
     float dist = -1.0;
 
+    float r = 3.f;
+    lights[0].position = vec3(4.f + r * cos(t), r*sin(t), 3.f);
+
     vec3 localRayCam = genLocalRayVector();
 
-    for (int i = 0; i < nbSpheres; i++) {
-        float distSpherei = calculateSphereIntersection(localRayCam, cameraPosition, sphere[i].spherePosition, sphere[i].sphereRadius);
+    for (int i = 0; i < sceneInfo.nbSpheres; i++) {
+        float distSpherei = calculateSphereIntersection(localRayCam, camera.position, i);
         
         bool update = (distSpherei >= 0.0) && (dist < 0.0 || distSpherei < dist);
         
@@ -113,7 +138,9 @@ void main() {
         idSphere = update ? i : idSphere;
     }
 
-    vec4 value = (dist < 0.0) ? vec4(0.0, 0.0, 1.0, 1.0) : vec4(sphere[idSphere].sphereColor, 1.0);
+    vec3 illumination = (dist >= 0.f) ? calculateIllumination(idSphere, dist * localRayCam) : vec3(0.f, 0.f, 0.f);
+
+    vec4 value = (dist < 0.0) ? vec4(0.1, 0.1, 0.1, 1.0) : vec4(spheres[idSphere].color * illumination, 1.0);
 
     imageStore(imgOutput, texelCoord, value);
 }

@@ -8,13 +8,15 @@ struct CameraData {
     glm::vec3 position;
     glm::quat orientation;
     glm::vec2 resolution;
-    float fov;
+    float fov = 90.f;
+    float iso = 200.f;
 };
 
 struct GPUCamData {
     glm::vec3 position;
     alignas(16) glm::vec2 resolution;
     float fovDist;
+    float iso;
 };
 
 class Camera {
