@@ -65,7 +65,7 @@ vec3 genLocalRayVector(){
     vec3 rayVector;
     rayVector.yz = gl_GlobalInvocationID.xy;
 
-    rayVector.x = camera.fov_x_dist;
+    rayVector.x = sin(t) * 200.f;//camera.fov_x_dist;
 
     rayVector.yz = rayVector.yz - (camera.resolution / 2.f);
 
@@ -110,7 +110,7 @@ vec3 calculateIllumination(int sphereId, vec3 positionIntersection){
             vec3 contactPos = positionIntersection;
             float intersect = calculateSphereIntersection(lightVecN, contactPos, sphereId_);
             // hasIntersections = ((true) && ((intersect <= 0.f) || (intersect >= dot(lightVecN, lightVec)))) ? hasIntersections : true;
-            hasIntersections = ((sphereId != sphereId_) && ((intersect > 0.f) && (intersect < dot(lightVecN, lightVec)))) ? true : hasIntersections;
+            hasIntersections = ((sphereId_ != sphereId) && ((intersect > 0.001) && (intersect < dot(lightVecN, lightVec)))) ? true : hasIntersections;
             
         }
         returnVal = (!hasIntersections) ? returnVal + (dot(lightVecN, normalVec) * currentLight.color * currentLight.intensity * camera.iso / dot(lightVec, lightVec)): returnVal;
@@ -125,12 +125,15 @@ void main() {
     float dist = -1.0;
 
     float r = 3.f;
-    lights[0].position = vec3(4.f + r * cos(t), r*sin(t), 3.f);
+    lights[0].position = vec3(4.f + r * cos(t), r*sin(t), 0.f);
+
+    // vec3 position = vec3(-20.0*sin(0.5* t) -15.0, 0.f, 0.f);
+    vec3 position = camera.position;
 
     vec3 localRayCam = genLocalRayVector();
 
     for (int i = 0; i < sceneInfo.nbSpheres; i++) {
-        float distSpherei = calculateSphereIntersection(localRayCam, camera.position, i);
+        float distSpherei = calculateSphereIntersection(localRayCam, position, i);
         
         bool update = (distSpherei >= 0.0) && (dist < 0.0 || distSpherei < dist);
         
@@ -138,9 +141,11 @@ void main() {
         idSphere = update ? i : idSphere;
     }
 
-    vec3 illumination = (dist >= 0.f) ? calculateIllumination(idSphere, dist * localRayCam) : vec3(0.f, 0.f, 0.f);
+    vec3 illumination = (dist >= 0.f) ? calculateIllumination(idSphere, dist * localRayCam + position) : vec3(0.f, 0.f, 0.f);
+    // vec3 illumination = vec3(1.f, 1.f, 1.f);
 
     vec4 value = (dist < 0.0) ? vec4(0.1, 0.1, 0.1, 1.0) : vec4(spheres[idSphere].color * illumination, 1.0);
+    // value = vec4(dist / 15, 0.f, 0.f, 0.f);
 
     imageStore(imgOutput, texelCoord, value);
 }
