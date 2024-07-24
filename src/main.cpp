@@ -30,6 +30,25 @@ class App: public GPGPU {
 			camData.iso = 50.f;
 			_scene.initCamera(camData);
 
+			MaterialData mat;
+			mat.color = {0.25, 0.f, 1.f};
+			mat.baseReflectance = {0.f, 0.5, 1.f};
+			mat.albedoMesh = {0.1, 0.2, 0.3};
+			mat.emssitivityMesh = {0.4, 0.5, 0.6};
+			mat.id = 0;
+			mat.roughness = 400.34;
+			mat.metalness = 238.9876;
+			_scene.add(mat);
+			mat.id = 1;
+			mat.color = {1.f, 1.f, 1.f};
+			_scene.add(mat);
+			mat.id = 2;
+			mat.color = {0.f, 1.f, 0.f};
+			_scene.add(mat);
+			mat.id = 3;
+			mat.color = {1.f, 0.f, 0.f};
+			_scene.add(mat);
+
 			LightData l1;
 			l1.intensity = 0.3;
 			l1.color = {1.f, 1.f, 1.f};
@@ -41,12 +60,12 @@ class App: public GPGPU {
 			_scene.add(l1);
 
 			SphereData sd;
-			sd.color = {0.25, 0.f, 1.f};
+			sd.materialId = 0;
 			sd.radius = 1.f;
 			sd.position = {5.0, 0.f, 0.f};
 			_scene.add(sd);
 
-			sd.color = {1.f, 1.f, 1.f};
+			sd.materialId = 1;
 			sd.radius = sphereRad;
 			sd.position = {10.0, 0.f, -sphereRad - (squareEdge / 2.f)};
 			_scene.add(sd);
@@ -57,11 +76,11 @@ class App: public GPGPU {
 			sd.position = {10.0, 0.f, sphereRad + (squareEdge / 2.f)};
 			_scene.add(sd);
 
-			sd.color = {0.f, 1.f, 0.f};
+			sd.materialId = 2;
 			sd.position = {10.0, sphereRad + (squareEdge / 2.f), 0.f};
 			_scene.add(sd);
 
-			sd.color = {1.f, 0.f, 0.f};
+			sd.materialId = 3;
 			sd.position = {10.0, -sphereRad - (squareEdge / 2.f), 0.f};
 			_scene.add(sd);
 

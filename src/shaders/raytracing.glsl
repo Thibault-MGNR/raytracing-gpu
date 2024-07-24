@@ -3,13 +3,23 @@
 /*
     Binding n°      associated block
         0                 time
-        1               
+        1             SceneInfoBlock
         2               imgOutput
         3              CameraBlock
         4              SpheresBlock
         5              LightsBlock
-        6                           
+        6             MaterialsBlock          
 */
+
+struct Material {
+    vec3 color;
+    vec3 baseReflectance;
+    vec3 albedoMesh;
+    vec3 emssitivityMesh;
+    int id;
+    float roughness;
+    float metalness;
+};
 
 struct Camera {
     vec3 position;
@@ -26,13 +36,14 @@ struct Light {
 
 struct Sphere {
     vec3 position;
-    vec3 color;
+    int materialId;
     float radius;
 };
 
 struct SceneInfo {
     int nbLights;
     int nbSpheres;
+    int nbMaterials;
 };
 
 layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
@@ -55,6 +66,10 @@ layout(std430, binding = 5) buffer LightsBlock {
     Light lights[];
 };
 
+layout(std430, binding = 6) buffer MaterialsBlock {
+    Material materials[];
+};
+
 layout (location = 0) uniform float t;                 /** Time */
 
 float square(float x){
@@ -65,7 +80,7 @@ vec3 genLocalRayVector(){
     vec3 rayVector;
     rayVector.yz = gl_GlobalInvocationID.xy;
 
-    rayVector.x = sin(t) * 200.f;//camera.fov_x_dist;
+    rayVector.x = camera.fov_x_dist;
 
     rayVector.yz = rayVector.yz - (camera.resolution / 2.f);
 
@@ -127,7 +142,6 @@ void main() {
     float r = 3.f;
     lights[0].position = vec3(4.f + r * cos(t), r*sin(t), 0.f);
 
-    // vec3 position = vec3(-20.0*sin(0.5* t) -15.0, 0.f, 0.f);
     vec3 position = camera.position;
 
     vec3 localRayCam = genLocalRayVector();
@@ -144,7 +158,10 @@ void main() {
     vec3 illumination = (dist >= 0.f) ? calculateIllumination(idSphere, dist * localRayCam + position) : vec3(0.f, 0.f, 0.f);
     // vec3 illumination = vec3(1.f, 1.f, 1.f);
 
-    vec4 value = (dist < 0.0) ? vec4(0.1, 0.1, 0.1, 1.0) : vec4(spheres[idSphere].color * illumination, 1.0);
+    Sphere currentSphere = spheres[idSphere];
+    Material currentMat = materials[currentSphere.materialId];
+
+    vec4 value = (dist < 0.0) ? vec4(0.1, 0.1, 0.1, 1.0) : vec4(currentMat.color * illumination, 1.0);
     // value = vec4(dist / 15, 0.f, 0.f, 0.f);
 
     imageStore(imgOutput, texelCoord, value);

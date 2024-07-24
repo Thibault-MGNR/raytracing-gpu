@@ -4,6 +4,7 @@
 
 struct SphereData {
     glm::vec3 position;
-    alignas(16) glm::vec3 color;
+    int materialId;
     float radius;
+    glm::vec3 padding;
 };

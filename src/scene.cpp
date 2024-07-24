@@ -11,10 +11,10 @@ void Scene::init(){
 // ------------------------------------------------------------------------
 
 void Scene::send(){
-    std::cout << GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT << std::endl;
     _ubo.subData(0, sizeof(sceneInfo), &_sceneInfo);
     _sphereManager.send();
     _lightManager.send();
+    _materialsManager.send();
 }
 
 // ------------------------------------------------------------------------
@@ -36,4 +36,11 @@ void Scene::add(const LightData light){
 void Scene::initCamera(const CameraData camData){
     _camData = camData;
     _camera.init(_camData);
+}
+
+// ------------------------------------------------------------------------
+
+void Scene::add(const MaterialData material){
+    _sceneInfo.nbMaterials++;
+    _materialsManager.add(material);
 }
