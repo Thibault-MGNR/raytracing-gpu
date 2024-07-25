@@ -46,6 +46,11 @@ struct SceneInfo {
     int nbMaterials;
 };
 
+struct CollisionInfo {
+    int idSphere;
+    float dist;
+};
+
 layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(rgba32f, binding = 2) uniform image2D imgOutput;
@@ -73,6 +78,7 @@ layout(std430, binding = 6) buffer MaterialsBlock {
 layout (location = 0) uniform float t;                 /** Time */
 
 #define PI 3.14159265359
+#define MAX_BOUNCES 800
 
 // ------------------------------------------------------------------------
 
@@ -100,14 +106,14 @@ vec3 genLocalRayVector(){
 float calculateSphereIntersection(vec3 rayVector, vec3 rayOrigin, int sphereId){
     Sphere sphere = spheres[sphereId];
     vec3 L = rayOrigin - sphere.position;
-    float b = 2.0 * dot(rayVector, L);
+    float b = 2.f * dot(rayVector, L);
     float c = dot(L, L) - (sphere.radius * sphere.radius);
 
-    float discriminant = (b * b) - 4.0 * c;
+    float discriminant = (b * b) - 4.f * c;
     float sqrtDiscriminant = sqrt(discriminant);
 
-    float t1 = (-b + sqrtDiscriminant) / 2.0;
-    float t2 = (-b - sqrtDiscriminant) / 2.0;
+    float t1 = (-b + sqrtDiscriminant) / 2.f;
+    float t2 = (-b - sqrtDiscriminant) / 2.f;
 
     float T = -1.f;
     T = (t1 > 0.f && t2 <= 0.f) ? t1 : T;
@@ -120,31 +126,48 @@ float calculateSphereIntersection(vec3 rayVector, vec3 rayOrigin, int sphereId){
 
 // ------------------------------------------------------------------------
 
+CollisionInfo nextCollision(vec3 ray, vec3 rayInitPosition){
+    CollisionInfo data;
+    data.idSphere = -1;
+    data.dist = -1.f;
+
+    for (int i = 0; i < sceneInfo.nbSpheres; i++) {
+        float distSpherei = calculateSphereIntersection(ray, rayInitPosition, i);
+        
+        bool update = (distSpherei >= 0.f) && (data.dist < 0.f || distSpherei < data.dist);
+        
+        data.dist = update ? distSpherei : data.dist;
+        data.idSphere = update ? i : data.idSphere;
+    }
+
+    return data;
+}
+
+// ------------------------------------------------------------------------
+
 float DistributionGGX(vec3 N, vec3 H, float roughness)
 {
     float a = roughness*roughness;
     float a2 = a*a;
-    float NdotH = max(dot(N, H), 0.0);
+    float NdotH = max(dot(N, H), 0.f);
     float NdotH2 = NdotH*NdotH;
 
     float nom   = a2;
-    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
+    float denom = (NdotH2 * (a2 - 1.f) + 1.f);
     denom = PI * denom * denom;
 
     return nom / denom;
 }
 
-float DistributionAnisotropic()
-
 // ------------------------------------------------------------------------
 
 float GeometrySchlickGGX(float NdotV, float roughness)
 {
-    float r = (roughness + 1.0);
-    float k = (r*r) / 8.0;
+    float r = (roughness + 1.f);
+    float k = (r*r) / 8.f;
 
     float nom   = NdotV;
-    float denom = NdotV * (1.0 - k) + k;
+    float denom = NdotV * (1.f - k) + k;
 
     return nom / denom;
 }
@@ -153,8 +176,8 @@ float GeometrySchlickGGX(float NdotV, float roughness)
 
 float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
 {
-    float NdotV = max(dot(N, V), 0.0);
-    float NdotL = max(dot(N, L), 0.0);
+    float NdotV = max(dot(N, V), 0.f);
+    float NdotL = max(dot(N, L), 0.f);
     float ggx2 = GeometrySchlickGGX(NdotV, roughness);
     float ggx1 = GeometrySchlickGGX(NdotL, roughness);
 
@@ -165,18 +188,18 @@ float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
 
 vec3 fresnelSchlick(float cosTheta, vec3 F0)
 {
-    return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+    return F0 + (1.f - F0) * pow(clamp(1.f - cosTheta, 0.f, 1.f), 5.f);
 }
 
 // ------------------------------------------------------------------------
 
-vec3 calculateIllumination(int sphereId, vec3 positionIntersection, vec3 V, float dist){
+vec3 calculateIllumination(int sphereId, vec3 positionIntersection, vec3 V){
     vec3 normalVec = normalize(positionIntersection - spheres[sphereId].position);
     vec3 returnVal = vec3(0.f, 0.f, 0.f);
     Material currentMaterial = materials[spheres[sphereId].materialId];
     vec3 F0 = vec3(0.04); 
     F0 = mix(F0, currentMaterial.color, currentMaterial.metalness);
-    vec3 Lo = vec3(0.0);
+    vec3 Lo = vec3(0.f);
 
     for(int lightId_ = 0; lightId_ < sceneInfo.nbLights; lightId_++){
         bool hasIntersections = false;
@@ -190,73 +213,84 @@ vec3 calculateIllumination(int sphereId, vec3 positionIntersection, vec3 V, floa
             float intersect = calculateSphereIntersection(lightVecN, contactPos, sphereId_);
             bool correctSphere = sphereId_ != sphereId;
             bool minIntersect = intersect > 0.001;
-            bool maxIntersect = intersect < dot(lightVecN, lightVec);
+            bool maxIntersect = intersect < dot(lightVecN, lightVec) + 0.001;
             hasIntersections = ((correctSphere) && ((minIntersect) && (maxIntersect))) ? true : hasIntersections;
-            
         }
-
-        // -----------------------------------------------------------------
     
         vec3 H = normalize(V + lightVecN);
         vec3 lightDistance = currentLight.position - positionIntersection;
-        float attenuation = 1.0 / dot(lightDistance, lightDistance);
+        float attenuation = 1.f / dot(lightDistance, lightDistance);
         vec3 radiance = currentLight.color * attenuation;
 
         float NDF = DistributionGGX(normalVec, H, currentMaterial.roughness);   
         float G   = GeometrySmith(normalVec, V, lightVecN, currentMaterial.roughness);      
-        vec3 F    = fresnelSchlick(clamp(dot(H, V), 0.0, 1.0), F0);
+        vec3 F    = fresnelSchlick(clamp(dot(H, V), 0.f, 1.f), F0);
         
         vec3 numerator    = NDF * G * F; 
-        float denominator = 4.0 * max(dot(normalVec, V), 0.0) * max(dot(normalVec, lightVecN), 0.0) + 0.0001;
+        float denominator = 4.f * max(dot(normalVec, V), 0.f) * max(dot(normalVec, lightVecN), 0.f) + 0.0001;
         vec3 specular = numerator / denominator;
 
         vec3 kS = F;
-        vec3 kD = vec3(1.0) - kS;
-        kD *= 1.0 - currentMaterial.metalness;	  
+        vec3 kD = vec3(1.f) - kS;
+        kD *= 1.f - currentMaterial.metalness;	  
 
-        float NdotL = max(dot(normalVec, lightVecN), 0.0);       
+        float NdotL = max(dot(normalVec, lightVecN), 0.f);       
 
         Lo = (!hasIntersections) ? Lo + (kD * currentMaterial.color / PI + specular) * radiance * NdotL : Lo;
-        
-        // vec3 ambient = vec3(0.03) * albedo * ao;
     }
     
-    return Lo;
+    return Lo + vec3(0.03) * currentMaterial.color;
 }
 
 // ------------------------------------------------------------------------
 
 void main() {
-    ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
+    float coef = 0.001f;
 
-    int idSphere = -1;
-    float dist = -1.0;
+    ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
 
     float r = 3.f;
     lights[0].position = vec3(4.f + r * cos(t), r*sin(t), 0.f);
 
     vec3 localRayCam = genLocalRayVector();
 
-    for (int i = 0; i < sceneInfo.nbSpheres; i++) {
-        float distSpherei = calculateSphereIntersection(localRayCam, camera.position, i);
-        
-        bool update = (distSpherei >= 0.0) && (dist < 0.0 || distSpherei < dist);
-        
-        dist = update ? distSpherei : dist;
-        idSphere = update ? i : idSphere;
-    }
-    vec3 illumination = (dist >= 0.f) ? calculateIllumination(idSphere, dist * localRayCam + camera.position, -localRayCam, dist) : vec3(0.f, 0.f, 0.f);
+    CollisionInfo collision = nextCollision(localRayCam, camera.position);
+    CollisionInfo firstCollision = collision;
 
-    Sphere currentSphere = spheres[idSphere];
+    vec3 positionIntersection = collision.dist * localRayCam + camera.position;
+    vec3 normalVec = normalize(positionIntersection - spheres[collision.idSphere].position);
+    positionIntersection += normalVec * coef;
+    
+    vec3 illumination = (collision.dist >= 0.f) ? calculateIllumination(collision.idSphere, positionIntersection, -localRayCam) : vec3(0.f, 0.f, 0.f);
+
+    vec3 V = localRayCam;
+    float test = 0;
+
+    for(int n = 0; n < MAX_BOUNCES; n++){
+        vec3 reflectVector = normalize(V - 2.f*dot(V, normalVec)*(normalVec));
+
+        collision = nextCollision(reflectVector, positionIntersection);
+        positionIntersection = reflectVector * collision.dist + positionIntersection;
+        normalVec = normalize(positionIntersection - spheres[collision.idSphere].position);
+        positionIntersection += normalVec * coef;
+
+            test = float(n);
+        if(collision.idSphere >= 0){
+            illumination += 0.5 * calculateIllumination(collision.idSphere, positionIntersection, - reflectVector);
+            V = reflectVector;
+        } else {
+            n = MAX_BOUNCES;
+        }
+    }
+
+    Sphere currentSphere = spheres[firstCollision.idSphere];
     Material currentMat = materials[currentSphere.materialId];
 
-    vec3 ambient = vec3(0.03) * currentMat.color * 1.0;
-    vec3 color = ambient + illumination;
+    illumination = illumination / (illumination + vec3(1.f));
 
-    color = color / (color + vec3(1.0));
-    // color = pow(color, vec3(1.0/2.2)); 
+    vec4 value = (firstCollision.dist < 0.f) ? vec4(0.1, 0.1, 0.1, 1.f) : vec4(illumination, 1.f);
 
-    vec4 value = (dist < 0.0) ? vec4(0.1, 0.1, 0.1, 1.0) : vec4(color, 1.0);
+    // vec4 value = vec4(test / float(MAX_BOUNCES), 0.0, 0.0, 1.0);
 
     imageStore(imgOutput, texelCoord, value);
 }

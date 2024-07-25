@@ -33,80 +33,38 @@ class App: public GPGPU {
 			MaterialData mat;
 			mat.color = {1.f, 0.f, 0.f};
 			mat.id = 0;
-			// mat.roughness = 0.3;
-			// mat.metalness = 1.5;
-			// _scene.add(mat);
+			mat.roughness = 0.1;
+			mat.metalness = 1.f;
+			_scene.add(mat);
 
-			// mat.metalness = 0.f;
-			// mat.id = 1;
-			// mat.color = {1.f, 1.f, 1.f};
-			// _scene.add(mat);
-
-			// mat.metalness = 0.f;
-			// mat.id = 2;
-			// mat.color = {0.f, 1.f, 0.f};
-			// _scene.add(mat);
-
-			// mat.metalness = 0.f;
-			// mat.id = 3;
-			// mat.color = {1.f, 0.f, 0.f};
-			// _scene.add(mat);
+			mat.metalness = 0.f;
+			mat.roughness = 1.f;
+			mat.id = 1;
+			mat.color = {1.f, 1.f, 1.f};
+			_scene.add(mat);
 
 			LightData l1;
-			l1.intensity = 500;
+			l1.intensity = 50;
 			l1.color = {1.f, 1.f, 1.f};
 			l1.color = l1.color * l1.intensity;
-			l1.position = {-10.f, 5.f, 5.f};
+			l1.position = {1.f, 0.f, 1.f};
 			_scene.add(l1);
-
-			l1.position = {10.f, 5.f, -5.f};
-			_scene.add(l1);
-
-			l1.position = {-10.f, -5.f, 5.f};
-			_scene.add(l1);
-
-			l1.position = {-10.f, -5.f, -5.f};
-			_scene.add(l1);
-
-			// l1.intensity = 1.f;
-			// l1.position = {3.f, 3.f, 3.f};
-			// _scene.add(l1);
 
 			SphereData sd;
 			sd.materialId = 0;
 			sd.radius = 1.f;
-			// sd.position = {5.0, 0.f, 0.f};
-			// _scene.add(sd);
+			sd.position = {5.0, 0.f, 0.f};
+			_scene.add(sd);
 
-			// sd.materialId = 1;
-			// sd.radius = sphereRad;
-			// sd.position = {10.0, 0.f, -sphereRad - (squareEdge / 2.f)};
-			// _scene.add(sd);
+			sd.materialId = 1;
+			sd.radius = 5000.f;
+			sd.position = {5.0, 0.f, -5001.f};
+			_scene.add(sd);
 
-			// sd.position = {sphereRad + squareEdge, 0.f, 0.f};
-			// _scene.add(sd);
-
-			// sd.position = {10.0, 0.f, sphereRad + (squareEdge / 2.f)};
-			// _scene.add(sd);
-
-			// sd.materialId = 2;
-			// sd.position = {10.0, sphereRad + (squareEdge / 2.f), 0.f};
-			// _scene.add(sd);
-
-			// sd.materialId = 3;
-			// sd.position = {10.0, -sphereRad - (squareEdge / 2.f), 0.f};
-			// _scene.add(sd);
-
-			for(int i = 0; i < 7; i++){
-				for(int j = 0; j < 7; j++){
-					mat.roughness = i / 6.f;
-					mat.metalness = j / 6.f;
-					_scene.add(mat);
-					sd.position = {15.0, j * 2.5 - 7.5, i * 2.5 - 7.5};
-					sd.materialId = 7*i + j;
-					_scene.add(sd);
-				}
-			}
+			sd.materialId = 1;
+			sd.radius = 5000.f;
+			sd.position = {5.0, 0.f, 5001.5};
+			_scene.add(sd);
 
 			_scene.send();
 		}
