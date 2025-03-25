@@ -50,10 +50,15 @@ class App: public GPGPU {
 			l1.position = {1.f, 0.f, 1.f};
 			_scene.add(l1);
 
+			l1.color = {0.3, 0.7, 1.f};
+			l1.position = {1.f, 0.f, 1.5};
+			l1.color = l1.color * l1.intensity;
+			_scene.add(l1);
+
 			SphereData sd;
 			sd.materialId = 0;
 			sd.radius = 1.f;
-			sd.position = {5.0, 0.f, 0.f};
+			sd.position = {5.0, 0.f, -1.f};
 			_scene.add(sd);
 
 			sd.materialId = 1;

@@ -201,83 +201,131 @@ vec3 fresnelSchlick(float cosTheta, vec3 F0){
 
 // ------------------------------------------------------------------------
 
-vec3 calculateIllumination(int sphereId, vec3 positionIntersection, vec3 V){
-    vec3 normalVec = normalize(positionIntersection - spheres[sphereId].position);
-
-    Material currentMaterial = materials[spheres[sphereId].materialId];
+vec3 PBR(vec3 viewDirection, vec3 normalVec, vec3 lightVecN, vec3 radiance, Material currentMaterial){
     vec3 F0 = vec3(0.04); 
     F0 = mix(F0, currentMaterial.color, currentMaterial.metalness);
-    vec3 Lo = vec3(0.f);
 
-    for(int lightId_ = 0; lightId_ < sceneInfo.nbLights; lightId_++){
-        bool hasIntersections = false;
-        Light currentLight = lights[lightId_];
-        vec3 lightVec = currentLight.position - positionIntersection;
-        vec3 lightVecN = normalize(currentLight.position - positionIntersection);
+    vec3 H = normalize(viewDirection + lightVecN);
 
-        for(int sphereId_ = 0; sphereId_ < sceneInfo.nbSpheres; sphereId_++){
-            Sphere currentSphere = spheres[sphereId_];
-            vec3 contactPos = positionIntersection;
-            float intersect = calculateSphereIntersection(lightVecN, contactPos, sphereId_);
-            bool correctSphere = sphereId_ != sphereId;
-            bool minIntersect = intersect > 0.001;
-            bool maxIntersect = intersect < dot(lightVecN, lightVec) + 0.001;
-            hasIntersections = ((correctSphere) && ((minIntersect) && (maxIntersect))) ? true : hasIntersections;
+    float NDF = DistributionGGX(normalVec, H, currentMaterial.roughness);   
+    float G   = GeometrySmith(normalVec, viewDirection, lightVecN, currentMaterial.roughness);      
+    vec3 F    = fresnelSchlick(clamp(dot(H, viewDirection), 0.f, 1.f), F0);
+    
+    vec3 numerator    = NDF * G * F; 
+    float denominator = 4.f * max(dot(normalVec, viewDirection), 0.f) * max(dot(normalVec, lightVecN), 0.f) + 0.0001;
+    vec3 specular = numerator / denominator;
+
+    vec3 kS = F;
+    vec3 kD = vec3(1.f) - kS;
+    kD *= 1.f - currentMaterial.metalness;	  
+
+    float NdotL = max(dot(normalVec, lightVecN), 0.f);  
+
+    return (kD * currentMaterial.color / PI + specular) * radiance * NdotL;
+}
+
+// ------------------------------------------------------------------------
+
+vec3 calculateSurfaceNormal(int sphereId, vec3 intersectionPosition) {
+    return normalize(intersectionPosition - spheres[sphereId].position);
+}
+
+// ------------------------------------------------------------------------
+
+bool isShadowed(vec3 intersectionPosition, vec3 lightDirection, vec3 lightVector, int currentSphereId) {
+    for (int otherSphereId = 0; otherSphereId < sceneInfo.nbSpheres; ++otherSphereId) {
+        if (otherSphereId == currentSphereId) continue;
+
+        float intersectionDistance = calculateSphereIntersection(lightDirection, intersectionPosition, otherSphereId);
+        if (intersectionDistance > 0.001 && intersectionDistance < dot(lightDirection, lightVector) + 0.001) {
+            return true;
         }
-    
-        vec3 H = normalize(V + lightVecN);
-        vec3 lightDistance = currentLight.position - positionIntersection;
-        float attenuation = 1.f / dot(lightDistance, lightDistance);
-        vec3 radiance = currentLight.color * attenuation;
-
-        float NDF = DistributionGGX(normalVec, H, currentMaterial.roughness);   
-        float G   = GeometrySmith(normalVec, V, lightVecN, currentMaterial.roughness);      
-        vec3 F    = fresnelSchlick(clamp(dot(H, V), 0.f, 1.f), F0);
-        
-        vec3 numerator    = NDF * G * F; 
-        float denominator = 4.f * max(dot(normalVec, V), 0.f) * max(dot(normalVec, lightVecN), 0.f) + 0.0001;
-        vec3 specular = numerator / denominator;
-
-        vec3 kS = F;
-        vec3 kD = vec3(1.f) - kS;
-        kD *= 1.f - currentMaterial.metalness;	  
-
-        float NdotL = max(dot(normalVec, lightVecN), 0.f);       
-
-        Lo = (!hasIntersections) ? Lo + (kD * currentMaterial.color / PI + specular) * radiance * NdotL : Lo;
     }
-    
-    return Lo + vec3(0.03) * currentMaterial.color;
+    return false;
+}
+
+// ------------------------------------------------------------------------
+
+float calculateAttenuation(vec3 lightVector) {
+    float lightDistanceSquared = dot(lightVector, lightVector);
+    return 1.f / lightDistanceSquared;
+}
+
+// ------------------------------------------------------------------------
+
+vec3 calculateIllumination(int sphereId, vec3 intersectionPosition, vec3 viewDirection) {
+    vec3 surfaceNormal = calculateSurfaceNormal(sphereId, intersectionPosition);
+    Material currentMaterial = materials[spheres[sphereId].materialId];
+    vec3 totalIllumination = vec3(0.f);
+
+    for (int lightId = 0; lightId < sceneInfo.nbLights; ++lightId) {
+        Light currentLight = lights[lightId];
+        vec3 lightDirection = normalize(currentLight.position - intersectionPosition);
+        vec3 lightVector = currentLight.position - intersectionPosition;
+
+        if (!isShadowed(intersectionPosition, lightDirection, lightVector, sphereId)) {
+            float attenuation = calculateAttenuation(lightVector);
+            vec3 radiance = currentLight.color * attenuation;
+            vec3 pbrColor = PBR(viewDirection, surfaceNormal, lightDirection, radiance, currentMaterial);
+            totalIllumination += pbrColor;
+        }
+    }
+
+    return totalIllumination + vec3(0.03) * currentMaterial.color;
+}
+
+// ------------------------------------------------------------------------
+
+void updateLightPositions() {
+    float r = 5.f;
+    lights[0].position = vec3(4.f + r * cos(t), r * sin(t), 0.7 * cos(2.f * t));
+    lights[1].position = vec3(4.f + r * cos(-0.7 * t), r * sin(-0.7 * t), 0.7 * cos(1.5 * t));
+}
+
+// ------------------------------------------------------------------------
+
+vec3 calculateSampleIllumination(CollisionInfo collision, vec3 localRayCam, float coef) {
+    if (collision.dist < 0.f) {
+        return vec3(0.f);
+    }
+
+    vec3 positionIntersection = collision.dist * localRayCam + camera.position;
+    vec3 normalVec = normalize(positionIntersection - spheres[collision.idSphere].position);
+    positionIntersection += normalVec * coef;
+
+    vec3 illumination = calculateIllumination(collision.idSphere, positionIntersection, -localRayCam);
+    return illumination / (illumination + vec3(1.f));
+}
+
+// ------------------------------------------------------------------------
+
+vec4 processIllumination(CollisionInfo collision, vec3 illumination) {
+    return (collision.dist < 0.f) ? vec4(0.1, 0.1, 0.1, 1.f) : vec4(illumination, 1.f);
+}
+
+// ------------------------------------------------------------------------
+
+void storeImageResult(writeonly image2D imgOutput, ivec2 texelCoord, vec4 accumulatedValue, int samples) {
+    imageStore(imgOutput, texelCoord, accumulatedValue / float(samples * samples));
 }
 
 // ------------------------------------------------------------------------
 
 void main() {
-    vec4 value;
+    vec4 accumulatedValue = vec4(0.f);
     float coef = 0.001f;
-
     ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
 
-    float r = 5.f;
-    lights[0].position = vec3(4.f + r * cos(t), r*sin(t), 0.7*cos(2.f*t));
+    updateLightPositions();
 
-    for(int i = 0; i < antiAliasedSamples*antiAliasedSamples; i++){
+    for (int i = 0; i < antiAliasedSamples * antiAliasedSamples; i++) {
         vec3 localRayCam = genLocalRayVector(i);
-
         CollisionInfo collision = nextCollision(localRayCam, camera.position);
 
-        vec3 positionIntersection = collision.dist * localRayCam + camera.position;
-        vec3 normalVec = normalize(positionIntersection - spheres[collision.idSphere].position);
-        positionIntersection += normalVec * coef;
-        
-        vec3 illumination = (collision.dist >= 0.f) ? calculateIllumination(collision.idSphere, positionIntersection, -localRayCam) : vec3(0.f, 0.f, 0.f);
-        
-
-        illumination = illumination / (illumination + vec3(1.f));
-
-        value += (collision.dist < 0.f) ? vec4(0.1, 0.1, 0.1, 1.f) : vec4(illumination, 1.f);
+        vec3 illumination = calculateSampleIllumination(collision, localRayCam, coef);
+        accumulatedValue += processIllumination(collision, illumination);
     }
 
-    imageStore(imgOutput, texelCoord, value/float(antiAliasedSamples*antiAliasedSamples));
+    storeImageResult(imgOutput, texelCoord, accumulatedValue, antiAliasedSamples);
 }
 
