@@ -78,7 +78,8 @@ layout(std430, binding = 6) buffer MaterialsBlock {
 layout (location = 0) uniform float t;                 /** Time */
 
 #define PI 3.14159265359
-#define MAX_BOUNCES 800
+#define MAX_BOUNCES 3
+#define antiAliasedSamples 3
 
 // ------------------------------------------------------------------------
 
@@ -88,13 +89,24 @@ float square(float x){
 
 // ------------------------------------------------------------------------
 
-vec3 genLocalRayVector(){
+vec2 generateJitter(int sampleIndex){
+    vec2 jitter;
+
+    jitter.x = (float(sampleIndex % antiAliasedSamples) + 0.5) / float(antiAliasedSamples) - 0.5;
+    jitter.y = (float(sampleIndex / antiAliasedSamples) + 0.5) / float(antiAliasedSamples) - 0.5;
+
+    return jitter;
+}
+
+// ------------------------------------------------------------------------
+
+vec3 genLocalRayVector(int n){
     vec3 rayVector;
     rayVector.yz = gl_GlobalInvocationID.xy;
 
     rayVector.x = camera.fov_x_dist;
 
-    rayVector.yz = rayVector.yz - (camera.resolution / 2.f);
+    rayVector.yz = rayVector.yz - (camera.resolution / 2.f) + generateJitter(n);
 
     rayVector = normalize(rayVector);
 
@@ -145,8 +157,7 @@ CollisionInfo nextCollision(vec3 ray, vec3 rayInitPosition){
 
 // ------------------------------------------------------------------------
 
-float DistributionGGX(vec3 N, vec3 H, float roughness)
-{
+float DistributionGGX(vec3 N, vec3 H, float roughness){
     float a = roughness*roughness;
     float a2 = a*a;
     float NdotH = max(dot(N, H), 0.f);
@@ -161,8 +172,7 @@ float DistributionGGX(vec3 N, vec3 H, float roughness)
 
 // ------------------------------------------------------------------------
 
-float GeometrySchlickGGX(float NdotV, float roughness)
-{
+float GeometrySchlickGGX(float NdotV, float roughness){
     float r = (roughness + 1.f);
     float k = (r*r) / 8.f;
 
@@ -174,8 +184,7 @@ float GeometrySchlickGGX(float NdotV, float roughness)
 
 // ------------------------------------------------------------------------
 
-float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
-{
+float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness){
     float NdotV = max(dot(N, V), 0.f);
     float NdotL = max(dot(N, L), 0.f);
     float ggx2 = GeometrySchlickGGX(NdotV, roughness);
@@ -186,8 +195,7 @@ float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
 
 // ------------------------------------------------------------------------
 
-vec3 fresnelSchlick(float cosTheta, vec3 F0)
-{
+vec3 fresnelSchlick(float cosTheta, vec3 F0){
     return F0 + (1.f - F0) * pow(clamp(1.f - cosTheta, 0.f, 1.f), 5.f);
 }
 
@@ -195,7 +203,7 @@ vec3 fresnelSchlick(float cosTheta, vec3 F0)
 
 vec3 calculateIllumination(int sphereId, vec3 positionIntersection, vec3 V){
     vec3 normalVec = normalize(positionIntersection - spheres[sphereId].position);
-    vec3 returnVal = vec3(0.f, 0.f, 0.f);
+
     Material currentMaterial = materials[spheres[sphereId].materialId];
     vec3 F0 = vec3(0.04); 
     F0 = mix(F0, currentMaterial.color, currentMaterial.metalness);
@@ -245,53 +253,31 @@ vec3 calculateIllumination(int sphereId, vec3 positionIntersection, vec3 V){
 // ------------------------------------------------------------------------
 
 void main() {
+    vec4 value;
     float coef = 0.001f;
 
     ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
 
-    float r = 3.f;
-    lights[0].position = vec3(4.f + r * cos(t), r*sin(t), 0.f);
+    float r = 5.f;
+    lights[0].position = vec3(4.f + r * cos(t), r*sin(t), 0.7*cos(2.f*t));
 
-    vec3 localRayCam = genLocalRayVector();
+    for(int i = 0; i < antiAliasedSamples*antiAliasedSamples; i++){
+        vec3 localRayCam = genLocalRayVector(i);
 
-    CollisionInfo collision = nextCollision(localRayCam, camera.position);
-    CollisionInfo firstCollision = collision;
+        CollisionInfo collision = nextCollision(localRayCam, camera.position);
 
-    vec3 positionIntersection = collision.dist * localRayCam + camera.position;
-    vec3 normalVec = normalize(positionIntersection - spheres[collision.idSphere].position);
-    positionIntersection += normalVec * coef;
-    
-    vec3 illumination = (collision.dist >= 0.f) ? calculateIllumination(collision.idSphere, positionIntersection, -localRayCam) : vec3(0.f, 0.f, 0.f);
-
-    vec3 V = localRayCam;
-    float test = 0;
-
-    for(int n = 0; n < MAX_BOUNCES; n++){
-        vec3 reflectVector = normalize(V - 2.f*dot(V, normalVec)*(normalVec));
-
-        collision = nextCollision(reflectVector, positionIntersection);
-        positionIntersection = reflectVector * collision.dist + positionIntersection;
-        normalVec = normalize(positionIntersection - spheres[collision.idSphere].position);
+        vec3 positionIntersection = collision.dist * localRayCam + camera.position;
+        vec3 normalVec = normalize(positionIntersection - spheres[collision.idSphere].position);
         positionIntersection += normalVec * coef;
+        
+        vec3 illumination = (collision.dist >= 0.f) ? calculateIllumination(collision.idSphere, positionIntersection, -localRayCam) : vec3(0.f, 0.f, 0.f);
+        
 
-            test = float(n);
-        if(collision.idSphere >= 0){
-            illumination += 0.5 * calculateIllumination(collision.idSphere, positionIntersection, - reflectVector);
-            V = reflectVector;
-        } else {
-            n = MAX_BOUNCES;
-        }
+        illumination = illumination / (illumination + vec3(1.f));
+
+        value += (collision.dist < 0.f) ? vec4(0.1, 0.1, 0.1, 1.f) : vec4(illumination, 1.f);
     }
 
-    Sphere currentSphere = spheres[firstCollision.idSphere];
-    Material currentMat = materials[currentSphere.materialId];
-
-    illumination = illumination / (illumination + vec3(1.f));
-
-    vec4 value = (firstCollision.dist < 0.f) ? vec4(0.1, 0.1, 0.1, 1.f) : vec4(illumination, 1.f);
-
-    // vec4 value = vec4(test / float(MAX_BOUNCES), 0.0, 0.0, 1.0);
-
-    imageStore(imgOutput, texelCoord, value);
+    imageStore(imgOutput, texelCoord, value/float(antiAliasedSamples*antiAliasedSamples));
 }
 
